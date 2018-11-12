@@ -5,5 +5,15 @@ import time
 import subprocess
 from threading import Thread
 import ClienteSR
+from InterfaceGrafica import *
 
-csr = ClienteSR()
+# modoDeJogo = 2
+
+# Create new threads
+thread1 = Configuracao(3)
+# Start new Threads
+thread1.start()
+
+# time.sleep(0.5)
+
+#csr = ClienteSR()
