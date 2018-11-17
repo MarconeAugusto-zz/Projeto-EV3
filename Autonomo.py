@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # coding: utf-8
+import pickle
 
 from Movimento import *
+
 
 class Tesouro:
     def __init__(self, eixoX, eixoY, distanciaAteORobo):
@@ -27,21 +29,22 @@ class Tesouro:
     def setDistanciaAteORobo(self, distanciaAteORobo):
         self.distanciaAteORobo = distanciaAteORobo
 
+
 class Autonomo:
 
-    def __init__(self, posAtual, listaDeCacas):
+    def __init__(self):
 
-        self.listaDeCacas = listaDeCacas
+        # self.listaDeCacas = listaDeCacas
+        self.listaDeCacas = []
         self.listaDeEstrategia = []
-        self.posAtual = posAtual
+        self.posAtual = Posicionamento(0,0,1)
         self.pausa = False
         self.finaliza = False
-        #self.anda = Movimento(40, 55, float(0.65), 1, float(0.02), -1, 41, 63)
 
-        if posAtual.eixoX == 0:
-            self.posAdversario = Posicionamento(20,20,3)
-        else:
-            self.posAdversario = Posicionamento(0, 0, 1)
+        # if posAtual.eixoX == 0:
+        #     self.posAdversario = Posicionamento(20,20,3)
+        # else:
+        #     self.posAdversario = Posicionamento(0, 0, 1)
 
     def setPosicaoAdvsersario(self, posAdversario):
         self.posicaoAdversario = posAdversario
@@ -66,6 +69,26 @@ class Autonomo:
         self.listaDeEstrategia.append(tesouro)
 
     def ordenaLista(self):
+        # solicitar a lista de cacas avaliar a mudanca para o SS
+
+        print("Ordena Lista")
+
+        ns = Pyro4.locateNS("191.36.15.46")  # IP do SS
+        uri = ns.lookup('listaCacas')
+        print(uri)
+        o = Pyro4.Proxy(uri)
+        lista = o.getListaCacas()
+        # enquanto a lista não tiver fim
+        tesouro1 = Tesouro(lista[0][0], lista[0][1], 0)
+        tesouro2 = Tesouro(lista[1][0], lista[1][1], 0)
+        tesouro3 = Tesouro(lista[2][0], lista[2][1], 0)
+
+        self.listaDeCacas.append(tesouro1)
+        self.listaDeCacas.append(tesouro2)
+        self.listaDeCacas.append(tesouro3)
+
+        # self.listaDeCacas = o.getListaCacas()
+        # print(o.getListaCacas())
 
         while len(self.listaDeCacas) != 0:
             self.distanciaMinima = 20
@@ -73,19 +96,21 @@ class Autonomo:
             self.i = 0
 
             for n in self.listaDeCacas:
-                self.distancia = abs(self.posAtual.getEixoX() + self.posAtual.getEixoX() - (self.listaDeCacas[self.i].getEixoX() + self.listaDeCacas[self.i].getEixoY()));
+                self.distancia = abs(self.posAtual.getEixoX() + self.posAtual.getEixoX() - (
+                            self.listaDeCacas[self.i].getEixoX() + self.listaDeCacas[self.i].getEixoY()));
                 if self.distancia < self.distanciaMinima:
                     self.distanciaMinima = self.distancia
                     self.menorI = self.i
-                self.i = (self.i+1)
+                self.i = (self.i + 1)
 
-            self.adicionarTesouro(self.listaDeCacas[self.menorI].getEixoX(), self.listaDeCacas[self.menorI].getEixoY(), self.distanciaMinima)
+            self.adicionarTesouro(self.listaDeCacas[self.menorI].getEixoX(), self.listaDeCacas[self.menorI].getEixoY(),
+                                  self.distanciaMinima)
             self.listaDeCacas.pop(self.menorI)
 
     def getListaDeEstrategia(self):
         return self.listaDeEstrategia
 
-    #CRIAR FUNÇÃO ESTRATÉGIA
+    # CRIAR FUNÇÃO ESTRATÉGIA
 
     def pausar(self):
         self.pausa = True
@@ -97,7 +122,9 @@ class Autonomo:
         self.finaliza = True
 
     def executaEstrategia(self):
-        #while not self.finaliza:
+        print("Executa estrategia")
+        # while not self.finaliza:
+        # obter a lista de cacas no SS
         self.ordenaLista()
 
         # print(self.listaDeEstrategia[0].getEixoX())
@@ -105,7 +132,8 @@ class Autonomo:
         # print(self.listaDeEstrategia[0].getDistanciaAteORobo())
 
         # EIXO Y
-        if (self.listaDeEstrategia[0].getEixoY() == self.getPosAtual().getEixoY()) and (self.listaDeEstrategia[0].getEixoX() == self.getPosAtual().getEixoX()):
+        if (self.listaDeEstrategia[0].getEixoY() == self.getPosAtual().getEixoY()) and (
+                self.listaDeEstrategia[0].getEixoX() == self.getPosAtual().getEixoX()):
             if len(self.listaDeEstrategia) > 1:
                 print("RETIREI")
                 self.listaDeEstrategia.pop(0)
@@ -118,28 +146,27 @@ class Autonomo:
             print("CHEGUEI!")
             self.executaEstrategia()
 
-        if self.listaDeEstrategia[0].getEixoY() < self.getPosAtual().getEixoY(): # SE A CACA ESTA ABAIXO DO ROBO
+        if self.listaDeEstrategia[0].getEixoY() < self.getPosAtual().getEixoY():  # SE A CACA ESTA ABAIXO DO ROBO
             print("CACA ESTA ABAIXO DO ROBO")
-            if self.getPosAtual().getOrientacao() != 3: # EH NECESSARIO SUL
+            if self.getPosAtual().getOrientacao() != 3:  # EH NECESSARIO SUL
 
-                if self.getPosAtual().getOrientacao() == 1: # NORTE
-                    #self.anda.move(3) #RE
+                if self.getPosAtual().getOrientacao() == 1:  # NORTE
+                    # self.anda.move(3) #RE
                     return 3
 
 
-                elif self.getPosAtual().getOrientacao() == 2: # Leste
-                    #self.anda.move(2)  # DIREITA
+                elif self.getPosAtual().getOrientacao() == 2:  # Leste
+                    # self.anda.move(2)  # DIREITA
                     return 2
 
                 else:  # OESTE
-                    #self.anda.move(1)  # ESQUERDA
+                    # self.anda.move(1)  # ESQUERDA
                     return 1
 
             else:
                 print("VOU PRA FRENTE POIS ACIMA")
-                #self.anda.move(0)  # FRENTE
+                # self.anda.move(0)  # FRENTE
                 return 0
-
 
         if self.listaDeEstrategia[0].getEixoY() > self.getPosAtual().getEixoY():  # SE A CACA ESTA ACIMA DO ROBO
             print("CACA ESTA ACIMA DO ROBO")
@@ -147,20 +174,20 @@ class Autonomo:
             if self.getPosAtual().getOrientacao() != 1:  # EH NECESSARIO NORTE
 
                 if self.getPosAtual().getOrientacao() == 2:  # LESTE
-                    #self.anda.move(1)  # ESQUERDA
+                    # self.anda.move(1)  # ESQUERDA
                     return 1
 
                 elif self.getPosAtual().getOrientacao() == 3:  # SUL
-                    #self.anda.move(3)  # RE
+                    # self.anda.move(3)  # RE
                     return 3
 
                 else:  # OESTE
-                    #self.anda.move(2)  # DIREITA
+                    # self.anda.move(2)  # DIREITA
                     return 2
 
             else:
                 print("VOU PRA FRENTE POIS ACIMA")
-                #self.anda.move(0)  # FRENTE
+                # self.anda.move(0)  # FRENTE
                 return 0
 
             # while self.listaDeEstrategia[0].getEixoY() != self.getPosAtual().getEixoY():
@@ -173,20 +200,20 @@ class Autonomo:
             if self.getPosAtual().getOrientacao() != 4:  # EH NECESSARIO OESTE
 
                 if self.getPosAtual().getOrientacao() == 1:  # NORTE
-                    #self.anda.move(1)  # ESQUERDA
+                    # self.anda.move(1)  # ESQUERDA
                     return 1
 
                 elif self.getPosAtual().getOrientacao() == 2:  # Leste
-                    #self.anda.move(3)  # RE
+                    # self.anda.move(3)  # RE
                     return 3
 
                 else:  # SUL
-                    #self.anda.move(2)  # DIREITA
+                    # self.anda.move(2)  # DIREITA
                     return 2
 
             else:
                 print("VOU PRA FRENTE POIS ACIMA")
-                #self.anda.move(0)  # FRENTE
+                # self.anda.move(0)  # FRENTE
                 return 0
 
 
@@ -196,23 +223,23 @@ class Autonomo:
             if self.getPosAtual().getOrientacao() != 2:  # EH NECESSARIO LESTE
 
                 if self.getPosAtual().getOrientacao() == 1:  # NORTE
-                    #self.anda.move(2)  # DIREITA
+                    # self.anda.move(2)  # DIREITA
                     return 2
 
                 elif self.getPosAtual().getOrientacao() == 3:  # SUL
-                    #self.anda.move(1)  # ESQUERDA
+                    # self.anda.move(1)  # ESQUERDA
                     return 1
 
                 else:  # OESTE
-                    #self.anda.move(3)  # RE
+                    # self.anda.move(3)  # RE
                     return 3
 
             else:
-                #self.anda.move(0)  # FRENTE
+                # self.anda.move(0)  # FRENTE
                 return 0
 
         # print("VOU EXECUTAR A ESTRATEGIA DE NOVO")
         # self.executaEstrategia()
 
-            # while self.listaDeEstrategia[0].getEixoX() != self.getPosAtual().getEixoX():
-            #     self.anda.move(0)  # FRENTE
+        # while self.listaDeEstrategia[0].getEixoX() != self.getPosAtual().getEixoX():
+        #     self.anda.move(0)  # FRENTE

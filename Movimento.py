@@ -10,25 +10,23 @@ from ev3dev.ev3 import *
 
 from Posicionamento import *
 from Autonomo import *
-
-#from Menu import *
-
-#from ComunicacaoSR_SS import *
 from ServidorSR import *
+
+modoDeJogo = 0
 
 
 @Pyro4.expose
+@Pyro4.oneway
 class Movimento:
-    def __init__(self, modoDeJogo):
-        self.power = 30
+    def __init__(self):
+        self.power = 32
         self.target = 55
         self.kp = float(0.65)
         self.kd = 1
         self.ki = float(0.02)
         self.direction = -1
-        self.minRef = 41
-        self.maxRef = 63
-        self.modoDeJogo = modoDeJogo
+        self.minRef = 30
+        self.maxRef = 55
         # Conecta os dois LargeMotor às portas B e C.
         self.motorEsquerda = LargeMotor(OUTPUT_C)
         self.motorDireita = LargeMotor(OUTPUT_B)
@@ -40,31 +38,31 @@ class Movimento:
         # Altera modo do sensor ultrassônico.
         self.sensorUS.mode = 'US-DIST-CM'
 
-        pos1 = Tesouro(3, 0, 0)
-        pos2 = Tesouro(0, 4, 0)
-        # pos3 = Tesouro(4, 5, 0)
-        self.lista2 = [pos1, pos2]
-        self.pos = Posicionamento(0, 0, 1)
-        self.aut = Autonomo(self.pos, self.lista2)
-
         self.comunica = ServidorSR()
+        self.aut = Autonomo()
+        self.pos = Posicionamento(0, 0, 1)
 
-    def modoJogo(self):
-	    # SELECIONA MODO DE JOGO
-	    if self.modoDeJogo == 1:  # Autonomo
-		    print("Consulta estrategia")
-		    direcao = self.aut.executaEstrategia()
-		    self.move(direcao)
-	    elif self.modoDeJogo == 2:  # Manual
-		    direcao = self.comunica.setDirecaoManual()
-		    self.move(direcao)
+    def modoJogo(self, mdj):
+        print("modo de jogo: ", mdj)
+        global modoDeJogo
+        modoDeJogo = mdj
+        # SELECIONA MODO DE JOGO
+        if modoDeJogo == 1:  # Autonomo
+            print("Consulta estrategia")
+            direcao = self.aut.executaEstrategia()
+            self.move(direcao)
+        # elif modoDeJogo == 2:  # Manual
+        # direcao = self.comunica.setDirecaoManual()
+        # self.move(direcao)
 
-    def move(self,direcao):
+    def move(self, direcao):
         # PAUSA DO 5 É PRO MODO AUTÔNOMO
         if direcao == 5:
             return
 
+        self.sensorCor.mode = 'COL-COLOR'  # Altera para modo refletido
         cor = self.sensorCor.value()
+
         if direcao == 0:
             self.frente(cor)
             pass
@@ -93,8 +91,8 @@ class Movimento:
             pass
 
         self.seguirLinha(self.power, self.target, self.kp, self.kd, self.ki, self.direction, self.minRef, self.maxRef)
-        print(self.pos.paraString())
         self.atualizaCoordenada()
+        print(self.pos.paraString())
 
     def atualizaOrientacaoRe(self):
         if self.pos.getOrientacao() == 3:
@@ -123,10 +121,6 @@ class Movimento:
 
     def esquerda(self, cor):
         # print("Virando para a esquerda")
-        while (cor != 1) and (cor != 6):  # Enquanto for verde
-            cor = self.sensorCor.value()
-            self.motorEsquerda.stop(stop_action='brake')
-            self.motorDireita.run_forever(speed_sp=100)
         while (cor != 1):
             cor = self.sensorCor.value()
             self.motorEsquerda.stop(stop_action='brake')
@@ -134,11 +128,10 @@ class Movimento:
 
     def direita(self, cor):
         # print("Virando para a direita")
-        self.frente(cor)
+        # self.frente(cor)
         self.motorDireita.stop(stop_action='brake')
-        self.motorEsquerda.run_forever(speed_sp=200)
-        sleep(1)
-        sleep(1)
+        self.motorEsquerda.run_forever(speed_sp=180)
+        sleep(2)
         while (cor != 1):
             cor = self.sensorCor.value()
             self.motorDireita.stop(stop_action='brake')
@@ -164,6 +157,9 @@ class Movimento:
         self.sensorCor.mode = 'COL-COLOR'  # Altera para modo cor
         cor = self.sensorCor.value()
         if (cor == 3):  # verde
+            # self.motorEsquerda.run_forever(speed_sp=10)
+            # self.motorDireita.run_forever(speed_sp= 10)
+            # sleep(0.5)
             self.motorEsquerda.stop(stop_action='brake')
             self.motorDireita.stop(stop_action='brake')
             return True
@@ -191,7 +187,7 @@ class Movimento:
         self.motorDireita.run_direct()
 
         while not self.btn.any():
-            self.detectarObstaculos()  # Para quando encontra um obstáculo
+            # self.detectarObstaculos()  # Para quando encontra um obstáculo
             self.sensorCor.mode = 'COL-REFLECT'  # Altera para modo refletido
             refRead = self.sensorCor.value()
             error = target - (100 * (refRead - minRef) / (maxRef - minRef))
@@ -205,54 +201,6 @@ class Movimento:
 
             self.interseccaoEncontrada = self.encontraInterseccao()
             if self.interseccaoEncontrada:
-                self.modoJogo()
+                global modoDeJogo
+                self.modoJogo(modoDeJogo)
                 break
-
-#############################################################################################################################
-class Controle(threading.Thread):
-    def __init__(self, threadID):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-
-    def get_ip(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            # doesn't even have to be reachable
-            s.connect(('10.255.255.255', 1))
-            IP = s.getsockname()[0]
-        except:
-            IP = '127.0.0.1'
-        finally:
-            s.close()
-        return IP
-
-    def registroServico(self):
-        print("Registrando a classe Movimento no Servidor de nomes")
-        with Pyro4.Daemon(Controle.get_ip()) as daemon:
-            # daemon = Pyro4.Daemon(get_ip())
-            ns = Pyro4.locateNS(Controle.get_ip())
-            uri = daemon.register(Movimento)
-            ns.register("Movimento", uri)
-            print("Classe Movimento registarda")
-            print(uri)
-            daemon.requestLoop()
-
-    def run(self):
-        print("Starting ", self.threadID)
-        print("ID", self.threadID)
-        if self.threadID == 1:
-            Controle.registroServico(self)
-        print("Exiting ", self.threadID)
-
-# Create new threads
-thread1 = Controle(1)
-# Start new Threads
-thread1.start()
-time.sleep(2)
-##############################################################################################################################
-'''
-REFERÊNCIAS
-
-As funções seguirLinha e guiarPelaLinha são adaptações do código orinigal disponível em: 
-https://github.com/Klabbedi/ev3
-'''

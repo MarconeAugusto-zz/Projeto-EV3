@@ -8,9 +8,10 @@ import Pyro4
 import socket
 from time import sleep
 from Movimento import *
+from ServidorSR import *
 
 ########################################################################################################################
-class controle(threading.Thread):
+class Controle(threading.Thread):
     def __init__(self, threadID):
         threading.Thread.__init__(self)
         self.threadID = threadID
@@ -29,25 +30,52 @@ class controle(threading.Thread):
 
     def startServer(self):
         print("start server")
-        Ip = controle.get_ip(self)
+        Ip = Controle.get_ip(self)
         str = "pyro4-ns --host "
         cmd = str + Ip
         print(cmd)
         subprocess.call(cmd, shell=True)
 
+
+    def registroServicoMovimento(self):
+        print("Registrando a classe Movimento no Servidor de nomes")
+        with Pyro4.Daemon(Controle.get_ip(self)) as daemon:
+            ns = Pyro4.locateNS(Controle.get_ip(self))
+            uri = daemon.register(Movimento)
+            ns.register("Movimento", uri)
+            print("Classe Movimento registarda")
+            print(uri)
+            daemon.requestLoop()
+
+    def registroServicoServidor(self):
+        print("Registrando a classe Servidor no servidor de nomes")
+        with Pyro4.Daemon(Controle.get_ip(self)) as daemon:
+            ns = Pyro4.locateNS(Controle.get_ip(self))
+            uri = daemon.register(ServidorSR)
+            ns.register('ServidorSR', uri)
+            print("Classe Servidor registarda")
+            print(uri)
+            daemon.requestLoop()
+
     def run(self):
         print("Starting ", self.threadID)
         print("ID", self.threadID)
         if self.threadID == 1:
-            controle.startServer(self)
+            Controle.startServer(self)
+        elif self.threadID == 2:
+            Controle.registroServicoMovimento(self)
+        else:
+            Controle.registroServicoServidor(self)
         print("Exiting ", self.threadID)
 
-##Create new threads
-thread1 = controle(1)
-##Start new Threads
-thread1.start()
-time.sleep(18)
-########################################################################################################################
+#if __name__ == '__main__':
+thread1 = Controle(1)
+thread2 = Controle(2)
+thread3 = Controle(3)
+#thread1.start()
+#time.sleep(30)
+thread2.start()
+time.sleep(2)
+thread3.start()
 
-mov = Movimento(2)
-mov.modoJogo()
+########################################################################################################################

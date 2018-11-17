@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import socket
+import subprocess
 from tkinter import *
 import threading
 import time
 import Pyro4
 from ClienteSR import *
+from SS import PrincipalSS
 
 class Packing:
 
-    def __init__(self, instancia_Tk):
+    def __init__(self, instancia_Tk,mdj):
 
-        modoDeJogo = 2
+        #modoDeJogo = 2
+        self.modoDeJogo = mdj
 
-        if modoDeJogo == 1:
+        if self.modoDeJogo == 1:
             instancia_Tk.title("Modo Autonomo")
             self.fontePadrao = ("Arial", "20")
             self.texto = StringVar()
@@ -21,7 +25,7 @@ class Packing:
             self.container1.pack()
             self.espaco = Label(self.container1, text='      ', font=self.fontePadrao, pady="20").pack()
 
-        elif modoDeJogo == 2:
+        elif self.modoDeJogo == 2:
             instancia_Tk.title("Modo Manual")
             self.fontePadrao = ("Arial", "20")
             self.texto = StringVar()
@@ -115,11 +119,6 @@ class Packing:
         self.texto.set("Finalizando a partida...")
         print("Finalizando a partida...")
         #self.raiz.destroy()
-    #
-    # def IniciaInterface(self,r):
-    #     raiz = r
-    #     Packing(raiz)
-    #     raiz.mainloop()
 
 
 class Configuracao(threading.Thread):
@@ -128,10 +127,48 @@ class Configuracao(threading.Thread):
         threading.Thread.__init__(self)
         self.threadID = threadID
 
+    # def get_ip(self):
+    #     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #     try:
+    #         # doesn't even have to be reachable
+    #         s.connect(('10.255.255.255', 1))
+    #         IP = s.getsockname()[0]
+    #     except:
+    #         IP = '127.0.0.1'
+    #     finally:
+    #         s.close()
+    #     return IP
+
+    def startServer(self):
+        print("start server")
+        #Ip = Configuracao.get_ip(self)
+        Ip = "191.36.15.46"
+        str = "pyro4-ns --host "
+        cmd = str + Ip
+        print(cmd)
+        subprocess.call(cmd, shell=True)
+
+    def registroServidorSS(self):
+        print("Registrando no servidor de nomes SS")
+        with Pyro4.Daemon("191.36.15.46") as daemon:
+            ns = Pyro4.locateNS("191.36.15.46")
+            uri = daemon.register(PrincipalSS)
+            ns.register("listaCacas", uri)
+            print("Classe PrincipalSS registarda")
+            print(uri)
+            daemon.requestLoop()
+
     def run(self):
         print("Starting ", self.threadID)
         print("ID", self.threadID)
-        if self.threadID == 3:
+        if self.threadID == 1:
             raiz = Tk()
-            Packing(raiz)
+            Packing(raiz,2)
+        elif self.threadID == 2:
+            Configuracao.startServer(self)
+        elif self.threadID == 3:
+            raiz = Tk()
+            Packing(raiz, 1)
+        elif self.threadID == 4:
+            Configuracao.registroServidorSS(self)
         print("Exiting ", self.threadID)
